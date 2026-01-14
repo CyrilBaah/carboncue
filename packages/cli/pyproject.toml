@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "carboncue-cli"
+version = "1.0.0"
+description = "Terminal interface for carbon-aware development"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+dependencies = [
+    "carboncue-sdk>=0.1.0",
+    "click>=8.1.8",
+    "rich>=13.9.4",
+    "python-dotenv>=1.0.1",
+]
+
+[project.scripts]
+carboncue = "carboncue_cli.main:cli"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/carboncue_cli"]
