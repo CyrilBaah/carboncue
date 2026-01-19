@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "carboncue-sdk"
 version = "1.0.0"
-description = "Core SDK for carbon-aware computing based on GSF principles"
+description = "Core SDK for carbon-aware computing"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

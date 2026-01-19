@@ -1,0 +1,130 @@
+name: 'CarbonCue'
+description: 'Check carbon intensity and gate CI/CD workflows for sustainable software development'
+author: 'Cyril Baah'
+
+branding:
+  icon: 'activity'
+  color: 'green'
+
+inputs:
+  region:
+    description: 'Cloud region (e.g., us-west-2, eu-west-1)'
+    required: true
+    default: 'us-west-2'
+
+  cloud-provider:
+    description: 'Cloud provider: aws, azure, gcp, digitalocean, other'
+    required: true
+    default: 'aws'
+
+  threshold:
+    description: 'Carbon intensity threshold in gCO2eq/kWh. Workflow fails if exceeded.'
+    required: false
+    default: '300'
+
+  fail-on-threshold:
+    description: 'Whether to fail the workflow if threshold is exceeded (true/false)'
+    required: false
+    default: 'false'
+
+  electricity-maps-api-key:
+    description: 'Electricity Maps API key (optional, uses CARBONCUE_ELECTRICITY_MAPS_API_KEY env var if not provided)'
+    required: false
+    default: ''
+
+outputs:
+  carbon-intensity:
+    description: 'Current carbon intensity in gCO2eq/kWh'
+    value: ${{ steps.carbon-check.outputs.carbon-intensity }}
+
+  status:
+    description: 'Status: low, medium, high, or very-high'
+    value: ${{ steps.carbon-check.outputs.status }}
+
+  recommendation:
+    description: 'Recommendation based on carbon intensity'
+    value: ${{ steps.carbon-check.outputs.recommendation }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install CarbonCue CLI
+      shell: bash
+      run: |
+        pip install --quiet carboncue-cli
+
+    - name: Check Carbon Intensity
+      id: carbon-check
+      shell: bash
+      env:
+        CARBONCUE_ELECTRICITY_MAPS_API_KEY: ${{ inputs.electricity-maps-api-key || env.CARBONCUE_ELECTRICITY_MAPS_API_KEY }}
+      run: |
+        echo "🌍 Checking carbon intensity for ${{ inputs.region }} (${{ inputs.cloud-provider }})"
+        
+        # Run carboncue check command
+        set +e
+        OUTPUT=$(carboncue check --region "${{ inputs.region }}" --provider "${{ inputs.cloud-provider }}" 2>&1)
+        EXIT_CODE=$?
+        set -e
+        
+        echo "$OUTPUT"
+        
+        # Handle errors
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Failed to check carbon intensity. Make sure CARBONCUE_ELECTRICITY_MAPS_API_KEY is set."
+          echo "carbon-intensity=0" >> $GITHUB_OUTPUT
+          echo "status=error" >> $GITHUB_OUTPUT
+          echo "recommendation=Unable to check carbon intensity" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+        # Parse output for carbon intensity (look for pattern like "250 gCO2eq/kWh")
+        CARBON_INTENSITY=$(echo "$OUTPUT" | grep -oP '\d+(?=\s*gCO2eq/kWh)' | head -1 || echo "0")
+        
+        echo "carbon-intensity=$CARBON_INTENSITY" >> $GITHUB_OUTPUT
+        
+        # Determine status and recommendation
+        THRESHOLD=${{ inputs.threshold }}
+        if [ "$CARBON_INTENSITY" -lt 100 ]; then
+          STATUS="low"
+          RECOMMENDATION="Excellent time to run compute-intensive workflows"
+        elif [ "$CARBON_INTENSITY" -lt 200 ]; then
+          STATUS="medium"
+          RECOMMENDATION="Good time to run workflows"
+        elif [ "$CARBON_INTENSITY" -lt "$THRESHOLD" ]; then
+          STATUS="high"
+          RECOMMENDATION="Consider deferring non-critical workloads"
+        else
+          STATUS="very-high"
+          RECOMMENDATION="High carbon intensity - consider deferring this workflow"
+        fi
+        
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "recommendation=$RECOMMENDATION" >> $GITHUB_OUTPUT
+        
+        # Generate summary
+        echo "## 🌍 CarbonCue Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Region | ${{ inputs.region }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cloud Provider | ${{ inputs.cloud-provider }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Carbon Intensity | ${CARBON_INTENSITY} gCO2eq/kWh |" >> $GITHUB_STEP_SUMMARY
+        echo "| Status | ${STATUS} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Threshold | ${THRESHOLD} gCO2eq/kWh |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Recommendation:** ${RECOMMENDATION}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Powered by [CarbonCue](https://github.com/CyrilBaah/carboncue)*" >> $GITHUB_STEP_SUMMARY
+        
+        # Check if we should fail on threshold
+        if [ "${{ inputs.fail-on-threshold }}" = "true" ] && [ "$CARBON_INTENSITY" -gt "$THRESHOLD" ]; then
+          echo "::error::Carbon intensity ($CARBON_INTENSITY gCO2eq/kWh) exceeds threshold ($THRESHOLD gCO2eq/kWh)"
+          exit 1
+        fi

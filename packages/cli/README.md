@@ -27,7 +27,7 @@ carboncue check -r us-east-1 -p aws
 
 ### Calculate SCI Score
 
-Calculate Software Carbon Intensity (SCI) score per GSF specification:
+Calculate Software Carbon Intensity (SCI) score:
 
 ```bash
 carboncue sci \
