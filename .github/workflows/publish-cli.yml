@@ -21,7 +21,6 @@ jobs:
     
     permissions:
       contents: read
-      id-token: write  # Required for trusted publishing
 
     steps:
       - name: Checkout code
@@ -55,8 +54,9 @@ jobs:
           python -m zipfile -l dist/*.whl | head -20
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.10.3
         with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: packages/cli/dist/
           print-hash: true
           verbose: true
