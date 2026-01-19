@@ -65,6 +65,9 @@ jobs:
     if: needs.determine-package.outputs.publish_sdk == 'true'
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: write
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -105,7 +108,7 @@ jobs:
       - name: Publish to PyPI
         run: |
           cd packages/sdk
-          python -m twine upload dist/* --verbose
+          python -m twine upload dist/* --skip-existing --verbose
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
@@ -129,6 +132,9 @@ jobs:
   publish-cli:
     name: Publish CLI to PyPI
     needs: determine-package
+    permissions:
+      contents: write
+    
     if: needs.determine-package.outputs.publish_cli == 'true'
     runs-on: ubuntu-latest
     
@@ -172,7 +178,7 @@ jobs:
       - name: Publish to PyPI
         run: |
           cd packages/cli
-          python -m twine upload dist/* --verbose
+          python -m twine upload dist/* --skip-existing --verbose
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
@@ -198,6 +204,9 @@ jobs:
   publish-action:
     name: Publish Action to Marketplace
     needs: determine-package
+    permissions:
+      contents: write
+    
     if: needs.determine-package.outputs.publish_action == 'true'
     runs-on: ubuntu-latest
     
