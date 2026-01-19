@@ -44,9 +44,14 @@ jobs:
           python -m build
           ls -la dist/
 
+      - name: Move artifacts to workspace root
+        run: |
+          mkdir -p dist
+          cp packages/cli/dist/* dist/
+          ls -la dist/
+
       - name: Verify build artifacts
         run: |
-          cd packages/cli
           echo "📦 Built packages:"
           ls -lh dist/
           echo ""
@@ -57,4 +62,5 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1.10.3
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-       
+          print-hash: true
+          verbose: true
