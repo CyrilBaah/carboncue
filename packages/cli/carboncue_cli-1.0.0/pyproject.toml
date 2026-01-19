@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = {text = "MIT"}
 
 dependencies = [
-    "carboncue-sdk>=1.0.0",
+    "carboncue-sdk>=0.1.0",
     "click>=8.1.8",
     "rich>=13.9.4",
     "python-dotenv>=1.0.1",

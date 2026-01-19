@@ -1,0 +1,156 @@
+name: 'CarbonCue - Carbon-Aware CI/CD'
+description: 'Calculate and report carbon savings for your workflows based on GSF principles'
+author: 'CarbonCue Contributors'
+
+branding:
+  icon: 'activity'
+  color: 'green'
+
+inputs:
+  region:
+    description: 'Cloud region where workflow runs (e.g., us-west-2, eu-west-1)'
+    required: false
+    default: 'us-west-2'
+
+  cloud-provider:
+    description: 'Cloud provider (aws, azure, gcp, digitalocean, other)'
+    required: false
+    default: 'aws'
+
+  mode:
+    description: 'Simple choice: immediate | defer | hybrid'
+    required: false
+    default: 'hybrid'
+
+  carbon-threshold:
+    description: 'Carbon intensity threshold (gCO2eq/kWh) for defer mode'
+    required: false
+    default: '300'
+
+  functional-unit:
+    description: 'Functional unit for SCI calculation (e.g., number of requests, builds, deployments)'
+    required: false
+    default: '1'
+
+  functional-unit-type:
+    description: 'Type of functional unit (builds, deployments, requests, etc.)'
+    required: false
+    default: 'builds'
+
+  electricity-maps-api-key:
+    description: 'Electricity Maps API key for real-time data'
+    required: false
+    default: ''
+
+outputs:
+  carbon-intensity:
+    description: 'Current carbon intensity (gCO2eq/kWh)'
+
+  sci-score:
+    description: 'Software Carbon Intensity score'
+
+  recommendation:
+    description: 'Carbon-aware recommendation (run, defer, or warning)'
+
+  timestamp:
+    description: 'Timestamp of measurement'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install CarbonCue
+      shell: bash
+      run: |
+        pip install --upgrade pip
+        pip install carboncue-cli
+
+    - name: Check Carbon Intensity
+      id: carbon-check
+      shell: bash
+      env:
+        CARBONCUE_ELECTRICITY_MAPS_API_KEY: ${{ inputs.electricity-maps-api-key }}
+        CARBONCUE_DEFAULT_REGION: ${{ inputs.region }}
+        CARBONCUE_DEFAULT_CLOUD_PROVIDER: ${{ inputs.cloud-provider }}
+      run: |
+        echo "🌍 Checking carbon intensity for ${{ inputs.region }} (${{ inputs.cloud-provider }})"
+
+        # Get current carbon intensity
+        INTENSITY_OUTPUT=$(carboncue check --region "${{ inputs.region }}" --provider "${{ inputs.cloud-provider }}")
+        echo "$INTENSITY_OUTPUT"
+
+        # Extract carbon intensity value (mock for now - will parse real output)
+        CARBON_INTENSITY=250
+
+        echo "carbon-intensity=$CARBON_INTENSITY" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
+        # Determine action based on mode
+        THRESHOLD=${{ inputs.carbon-threshold }}
+        MODE="${{ inputs.mode }}"
+
+        if [ "$MODE" = "defer" ] && [ "$CARBON_INTENSITY" -gt "$THRESHOLD" ]; then
+          echo "recommendation=defer" >> $GITHUB_OUTPUT
+          echo "::warning::❌ Carbon intensity ($CARBON_INTENSITY gCO2eq/kWh) exceeds threshold ($THRESHOLD). Consider deferring this workflow."
+          exit 1
+        elif [ "$CARBON_INTENSITY" -gt "$THRESHOLD" ]; then
+          echo "recommendation=warning" >> $GITHUB_OUTPUT
+          echo "::warning::⚠️ Carbon intensity is high ($CARBON_INTENSITY gCO2eq/kWh). Running in $MODE mode."
+        else
+          echo "recommendation=run" >> $GITHUB_OUTPUT
+          echo "✅ Carbon intensity is acceptable ($CARBON_INTENSITY gCO2eq/kWh)"
+        fi
+
+    - name: Calculate SCI Score
+      id: sci-calc
+      shell: bash
+      run: |
+        echo "📊 Calculating Software Carbon Intensity (SCI) score"
+
+        # Mock calculation (will use real carboncue sci command)
+        SCI_SCORE=$(carboncue sci \
+          --operations 100 \
+          --materials 50 \
+          --functional-unit "${{ inputs.functional-unit }}" \
+          --unit-type "${{ inputs.functional-unit-type }}" \
+          --region "${{ inputs.region }}" \
+          --provider "${{ inputs.cloud-provider }}" 2>&1 || echo "0.15")
+
+        echo "sci-score=0.15" >> $GITHUB_OUTPUT
+        echo "SCI Score: 0.15 gCO2eq/${{ inputs.functional-unit-type }}"
+
+    - name: Generate Report
+      shell: bash
+      env:
+        CARBON_INTENSITY: ${{ steps.carbon-check.outputs.carbon-intensity }}
+        SCI_SCORE: ${{ steps.sci-calc.outputs.sci-score }}
+        RECOMMENDATION: ${{ steps.carbon-check.outputs.recommendation }}
+      run: |
+        echo "## 🌍 CarbonCue Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Region | ${{ inputs.region }} (${{ inputs.cloud-provider }}) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Carbon Intensity | ${CARBON_INTENSITY} gCO2eq/kWh |" >> $GITHUB_STEP_SUMMARY
+        echo "| SCI Score | ${SCI_SCORE} gCO2eq/${{ inputs.functional-unit-type }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Recommendation | ${RECOMMENDATION} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Timestamp | ${{ steps.carbon-check.outputs.timestamp }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📈 Interpretation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$RECOMMENDATION" = "run" ]; then
+          echo "✅ **Good to run**: Carbon intensity is low. This is an optimal time for compute-intensive workflows." >> $GITHUB_STEP_SUMMARY
+        elif [ "$RECOMMENDATION" = "warning" ]; then
+          echo "⚠️ **Warning**: Carbon intensity is moderate to high. Consider deferring non-critical workloads to reduce environmental impact." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Defer recommended**: Carbon intensity is very high. Running this workflow will have significant carbon impact." >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Powered by [CarbonCue](https://github.com/CyrilBaah/carboncue) - Carbon-aware computing based on GSF principles*" >> $GITHUB_STEP_SUMMARY

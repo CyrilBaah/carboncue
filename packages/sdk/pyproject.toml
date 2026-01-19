@@ -3,34 +3,26 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "carboncue-cli"
+name = "carboncue-sdk"
 version = "1.0.0"
-description = "Terminal interface for carbon-aware development"
+description = "Core SDK for carbon-aware computing based on GSF principles"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 
 dependencies = [
-    "carboncue-sdk>=1.0.0",
-    "click>=8.1.8",
-    "rich>=13.9.4",
+    "httpx>=0.28.1",
+    "pydantic>=2.10.5",
+    "pydantic-settings>=2.7.1",
     "python-dotenv>=1.0.1",
 ]
-
-[project.scripts]
-carboncue = "carboncue_cli.main:cli"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.2",
-]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "src/carboncue_cli",
-    "README.md",
+    "pytest-mock>=3.14.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/carboncue_cli"]
+packages = ["src/carboncue_sdk"]

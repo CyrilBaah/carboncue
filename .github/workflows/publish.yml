@@ -1,0 +1,238 @@
+name: Publish to PyPI & Marketplace
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (sdk-v1.0.0, cli-v1.0.0, v1.0.0 for action, or v1.0.0-all for everything)'
+        required: true
+        type: string
+
+jobs:
+  determine-package:
+    name: Determine what to publish
+    runs-on: ubuntu-latest
+    outputs:
+      publish_sdk: ${{ steps.check.outputs.publish_sdk }}
+      publish_cli: ${{ steps.check.outputs.publish_cli }}
+      publish_action: ${{ steps.check.outputs.publish_action }}
+      version: ${{ steps.check.outputs.version }}
+    
+    steps:
+      - name: Check tag format
+        id: check
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          echo "Tag: $TAG"
+          
+          if [[ $TAG == sdk-v* ]]; then
+            echo "publish_sdk=true" >> $GITHUB_OUTPUT
+            echo "publish_cli=false" >> $GITHUB_OUTPUT
+            echo "publish_action=false" >> $GITHUB_OUTPUT
+            echo "version=${TAG#sdk-v}" >> $GITHUB_OUTPUT
+            echo "📦 Publishing SDK only"
+          elif [[ $TAG == cli-v* ]]; then
+            echo "publish_sdk=false" >> $GITHUB_OUTPUT
+            echo "publish_cli=true" >> $GITHUB_OUTPUT
+            echo "publish_action=false" >> $GITHUB_OUTPUT
+            echo "version=${TAG#cli-v}" >> $GITHUB_OUTPUT
+            echo "📦 Publishing CLI only"
+          elif [[ $TAG == *-all ]]; then
+            echo "publish_sdk=true" >> $GITHUB_OUTPUT
+            echo "publish_cli=true" >> $GITHUB_OUTPUT
+            echo "publish_action=true" >> $GITHUB_OUTPUT
+            echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+            echo "version=${TAG%-all}" >> $GITHUB_OUTPUT
+            echo "version=${TAG#v}" | sed 's/-all$//' >> $GITHUB_OUTPUT
+            VERSION="${TAG#v}"
+            VERSION="${VERSION%-all}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "📦 Publishing ALL: SDK, CLI, and Action"
+          elif [[ $TAG == v* ]]; then
+            echo "publish_sdk=false" >> $GITHUB_OUTPUT
+            echo "publish_cli=false" >> $GITHUB_OUTPUT
+            echo "publish_action=true" >> $GITHUB_OUTPUT
+            echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+            echo "📦 Publishing Action only"
+          else
+            echo "❌ Invalid tag format. Use: sdk-v1.0.0, cli-v1.0.0, v1.0.0, or v1.0.0-all"
+            exit 1
+          fi
+
+  publish-sdk:
+    name: Publish SDK to PyPI
+    needs: determine-package
+    if: needs.determine-package.outputs.publish_sdk == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Verify version
+        run: |
+          cd packages/sdk
+          VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          if [ "$VERSION" != "${{ needs.determine-package.outputs.version }}" ]; then
+            echo "❌ Version mismatch!"
+            echo "   pyproject.toml: $VERSION"
+            echo "   Expected: ${{ needs.determine-package.outputs.version }}"
+            exit 1
+          fi
+          echo "✅ Version matches: $VERSION"
+
+      - name: Build package
+        run: |
+          cd packages/sdk
+          python -m build --verbose
+          ls -la dist/
+
+      - name: Verify package
+        run: |
+          cd packages/sdk
+          python -m twine check dist/*
+
+      - name: Publish to PyPI
+        run: |
+          cd packages/sdk
+          python -m twine upload dist/* --verbose
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: CarbonCue SDK v${{ needs.determine-package.outputs.version }}
+          body: |
+            ## 📦 CarbonCue SDK v${{ needs.determine-package.outputs.version }}
+            
+            Published to PyPI: https://pypi.org/project/carboncue-sdk/${{ needs.determine-package.outputs.version }}/
+            
+            Install with:
+            ```bash
+            pip install carboncue-sdk==${{ needs.determine-package.outputs.version }}
+            ```
+          files: packages/sdk/dist/*
+
+  publish-cli:
+    name: Publish CLI to PyPI
+    needs: determine-package
+    if: needs.determine-package.outputs.publish_cli == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Verify version
+        run: |
+          cd packages/cli
+          VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          if [ "$VERSION" != "${{ needs.determine-package.outputs.version }}" ]; then
+            echo "❌ Version mismatch!"
+            echo "   pyproject.toml: $VERSION"
+            echo "   Expected: ${{ needs.determine-package.outputs.version }}"
+            exit 1
+          fi
+          echo "✅ Version matches: $VERSION"
+
+      - name: Build package
+        run: |
+          cd packages/cli
+          python -m build --verbose
+          ls -la dist/
+
+      - name: Verify package
+        run: |
+          cd packages/cli
+          python -m twine check dist/*
+
+      - name: Publish to PyPI
+        run: |
+          cd packages/cli
+          python -m twine upload dist/* --verbose
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: CarbonCue CLI v${{ needs.determine-package.outputs.version }}
+          body: |
+            ## 💻 CarbonCue CLI v${{ needs.determine-package.outputs.version }}
+            
+            Published to PyPI: https://pypi.org/project/carboncue-cli/${{ needs.determine-package.outputs.version }}/
+            
+            Install with:
+            ```bash
+            pip install carboncue-cli==${{ needs.determine-package.outputs.version }}
+            ```
+            
+            See [RELEASE_NOTES_CLI_v${{ needs.determine-package.outputs.version }}.md](../blob/master/RELEASE_NOTES_CLI_v${{ needs.determine-package.outputs.version }}.md) for details.
+          files: packages/cli/dist/*
+
+  publish-action:
+    name: Publish Action to Marketplace
+    needs: determine-package
+    if: needs.determine-package.outputs.publish_action == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify action.yml exists
+        run: |
+          if [ ! -f "packages/action/action.yml" ]; then
+            echo "❌ packages/action/action.yml not found!"
+            exit 1
+          fi
+          echo "✅ Action configuration found"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: CarbonCue Action v${{ needs.determine-package.outputs.version }}
+          body: |
+            ## 🎯 CarbonCue GitHub Action v${{ needs.determine-package.outputs.version }}
+            
+            Available on GitHub Marketplace!
+            
+            Usage:
+            ```yaml
+            - uses: CyrilBaah/carboncue@${{ github.event.inputs.tag }}
+              with:
+                mode: 'hybrid'
+            ```
+            
+            See [packages/action/README.md](../blob/master/packages/action/README.md) for full documentation.
+
+      - name: Publish to Marketplace
+        run: |
+          echo "🎉 GitHub Action published to Marketplace!"
+          echo "   Users can now use: CyrilBaah/carboncue@${{ github.event.inputs.tag }}"

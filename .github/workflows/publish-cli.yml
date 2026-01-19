@@ -1,12 +1,10 @@
 name: Publish CLI to PyPI
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to release (e.g., cli-v1.0.0)'
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
         required: true
         type: string
 
@@ -14,19 +12,15 @@ jobs:
   publish-cli:
     name: Publish carboncue-cli to PyPI
     runs-on: ubuntu-latest
-    # Only run if the release tag starts with 'cli-v' OR manually triggered
-    if: |
-      (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/cli-v')) ||
-      (github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.tag, 'cli-v'))
     
     permissions:
       contents: read
 
     steps:
-      - name: Checkout code
+      - name: Checkout latest code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+          ref: master
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,31 +30,44 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build hatchling
+          pip install build twine
 
-      - name: Build CLI package
+      - name: Verify version matches
         run: |
           cd packages/cli
-          python -m build
+          VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          if [ "$VERSION" != "${{ github.event.inputs.version }}" ]; then
+            echo "❌ Version mismatch!"
+            echo "   pyproject.toml: $VERSION"
+            echo "   Input version: ${{ github.event.inputs.version }}"
+            exit 1
+          fi
+          echo "✅ Version matches: $VERSION"
+
+      - name: Build package
+        run: |
+          cd packages/cli
+          python -m build --verbose
           ls -la dist/
 
-      - name: Move artifacts to workspace root
+      - name: Verify package with twine
         run: |
-          mkdir -p dist
-          cp packages/cli/dist/* dist/
-          ls -la dist/
+          cd packages/cli
+          python -m twine check dist/*
 
-      - name: Verify build artifacts
+      - name: Display package info
         run: |
+          cd packages/cli
           echo "📦 Built packages:"
           ls -lh dist/
           echo ""
-          echo "🔍 Package contents:"
-          python -m zipfile -l dist/*.whl | head -20
+          echo "🔍 Wheel contents:"
+          unzip -l dist/*.whl | head -20
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.10.3
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          print-hash: true
-          verbose: true
+        run: |
+          cd packages/cli
+          python -m twine upload dist/* --verbose
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
