@@ -26,5 +26,11 @@ dev = [
     "pytest-asyncio>=0.25.2",
 ]
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/carboncue_cli",
+    "README.md",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/carboncue_cli"]
