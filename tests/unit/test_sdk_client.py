@@ -1,9 +1,19 @@
 """Unit tests for CarbonCue SDK client."""
 
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from carboncue_sdk import CarbonClient, CarbonConfig
+from carboncue_sdk.exceptions import (
+    APIError,
+    AuthenticationError,
+    DataNotAvailableError,
+    InvalidProviderError,
+    InvalidRegionError,
+    RateLimitError,
+)
 from carboncue_sdk.models import CarbonIntensity, SCIScore
 
 
@@ -73,15 +83,109 @@ class TestCarbonClient:
 
     @pytest.mark.asyncio
     async def test_get_current_intensity(self, client: CarbonClient) -> None:
-        """Test getting current carbon intensity."""
+        """Test getting current carbon intensity with mocked API."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "carbonIntensity": 250.5,
+            "fossilFuelPercentage": 60.0,
+            "renewablePercentage": 40.0,
+        }
+
         async with client:
-            intensity = await client.get_current_intensity(region="us-west-2", provider="aws")
+            with patch.object(client._http_client, "get", return_value=mock_response):
+                intensity = await client.get_current_intensity(region="us-west-2", provider="aws")
 
         assert isinstance(intensity, CarbonIntensity)
         assert intensity.region == "us-west-2"
-        assert intensity.carbon_intensity > 0
-        assert isinstance(intensity.timestamp, datetime)
-        assert intensity.source == "mock"  # Currently using mock data
+        assert intensity.carbon_intensity == 250.5
+        assert intensity.fossil_fuel_percentage == 60.0
+        assert intensity.renewable_percentage == 40.0
+        assert intensity.source == "ElectricityMaps"
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_invalid_region(self, client: CarbonClient) -> None:
+        """Test that invalid region raises InvalidRegionError."""
+        async with client:
+            with pytest.raises(InvalidRegionError, match="Unsupported region"):
+                await client.get_current_intensity(region="invalid-region", provider="aws")
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_invalid_provider(self, client: CarbonClient) -> None:
+        """Test that invalid provider raises InvalidProviderError."""
+        async with client:
+            with pytest.raises(InvalidProviderError, match="Unsupported cloud provider"):
+                await client.get_current_intensity(region="us-west-2", provider="invalid")
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_no_api_key(self) -> None:
+        """Test that missing API key raises AuthenticationError."""
+        config = CarbonConfig(electricity_maps_api_key=None)
+        client = CarbonClient(config=config)
+
+        async with client:
+            with pytest.raises(AuthenticationError, match="API key not configured"):
+                await client.get_current_intensity(region="us-west-2")
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_rate_limit(self, client: CarbonClient) -> None:
+        """Test that rate limit response raises RateLimitError."""
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+
+        async with client:
+            with patch.object(client._http_client, "get", return_value=mock_response):
+                with pytest.raises(RateLimitError, match="rate limit exceeded"):
+                    await client.get_current_intensity(region="us-west-2")
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_auth_error(self, client: CarbonClient) -> None:
+        """Test that 401 response raises AuthenticationError."""
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+
+        async with client:
+            with patch.object(client._http_client, "get", return_value=mock_response):
+                with pytest.raises(AuthenticationError, match="Invalid"):
+                    await client.get_current_intensity(region="us-west-2")
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_data_not_available(self, client: CarbonClient) -> None:
+        """Test that 404 response raises DataNotAvailableError."""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+
+        async with client:
+            with patch.object(client._http_client, "get", return_value=mock_response):
+                with pytest.raises(DataNotAvailableError, match="not available"):
+                    await client.get_current_intensity(region="us-west-2")
+
+    @pytest.mark.asyncio
+    async def test_get_current_intensity_caching(self) -> None:
+        """Test that caching works correctly."""
+        config = CarbonConfig(electricity_maps_api_key="test-key", enable_caching=True)
+        client = CarbonClient(config=config)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "carbonIntensity": 250.5,
+            "fossilFuelPercentage": 60.0,
+            "renewablePercentage": 40.0,
+        }
+
+        async with client:
+            with patch.object(client._http_client, "get", return_value=mock_response) as mock_get:
+                # First call - should hit API
+                intensity1 = await client.get_current_intensity(region="us-west-2")
+                assert mock_get.call_count == 1
+
+                # Second call - should use cache
+                intensity2 = await client.get_current_intensity(region="us-west-2")
+                assert mock_get.call_count == 1  # Still only 1 call
+
+                # Both should have same values
+                assert intensity1.carbon_intensity == intensity2.carbon_intensity
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:

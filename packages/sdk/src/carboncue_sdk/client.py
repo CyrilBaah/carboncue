@@ -6,7 +6,16 @@ from typing import Any
 import httpx
 
 from carboncue_sdk.config import CarbonConfig
+from carboncue_sdk.exceptions import (
+    APIError,
+    AuthenticationError,
+    DataNotAvailableError,
+    InvalidProviderError,
+    InvalidRegionError,
+    RateLimitError,
+)
 from carboncue_sdk.models import CarbonIntensity, SCIScore
+from carboncue_sdk.region_mapper import RegionMapper
 
 
 class CarbonClient:
@@ -87,27 +96,109 @@ class CarbonClient:
             Current carbon intensity data
 
         Raises:
-            httpx.HTTPError: If API request fails
-            ValueError: If region is invalid
+            InvalidRegionError: If region is not supported
+            InvalidProviderError: If provider is not supported
+            AuthenticationError: If API key is missing or invalid
+            RateLimitError: If API rate limit exceeded
+            DataNotAvailableError: If data not available for region
+            APIError: If API request fails
         """
         cache_key = f"intensity:{provider}:{region}"
         cached = self._get_from_cache(cache_key)
         if cached is not None:
             return cached  # type: ignore[no-any-return]
 
-        # For now, return mock data - will integrate real APIs in implementation
-        # This follows Principle VI: Prefer Existing Solutions
-        # TODO: Integrate Electricity Maps API or GSF Carbon-Aware SDK
-        intensity = CarbonIntensity(
-            region=region,
-            carbon_intensity=250.0,  # Mock: Average global grid intensity
-            fossil_fuel_percentage=60.0,
-            renewable_percentage=40.0,
-            source="mock",  # Will be "ElectricityMaps" or "GSF SDK"
-        )
+        # Map cloud region to Electricity Maps zone
+        try:
+            zone_id = RegionMapper.get_zone_id(region, provider)
+        except ValueError as e:
+            error_msg = str(e)
+            if "cloud provider" in error_msg.lower():
+                raise InvalidProviderError(error_msg) from e
+            raise InvalidRegionError(error_msg) from e
+
+        # Get data from Electricity Maps API
+        intensity = await self._fetch_from_electricity_maps(zone_id, region)
 
         self._set_cache(cache_key, intensity)
         return intensity
+
+    async def _fetch_from_electricity_maps(
+        self, zone_id: str, original_region: str
+    ) -> CarbonIntensity:
+        """Fetch carbon intensity from Electricity Maps API.
+
+        Args:
+            zone_id: Electricity Maps zone identifier
+            original_region: Original cloud region code
+
+        Returns:
+            Carbon intensity data
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid
+            RateLimitError: If API rate limit exceeded
+            DataNotAvailableError: If data not available
+            APIError: If API request fails
+        """
+        if not self.config.electricity_maps_api_key:
+            raise AuthenticationError(
+                "Electricity Maps API key not configured. "
+                "Set CARBONCUE_ELECTRICITY_MAPS_API_KEY environment variable."
+            )
+
+        if not self._http_client:
+            raise APIError("HTTP client not initialized. Use async context manager.")
+
+        url = f"{self.config.electricity_maps_base_url}/carbon-intensity/latest"
+        params = {"zone": zone_id}
+
+        try:
+            response = await self._http_client.get(url, params=params)
+
+            # Handle rate limiting
+            if response.status_code == 429:
+                raise RateLimitError(
+                    "Electricity Maps API rate limit exceeded. Please try again later."
+                )
+
+            # Handle authentication errors
+            if response.status_code == 401:
+                raise AuthenticationError("Invalid Electricity Maps API key.")
+
+            # Handle data not available
+            if response.status_code == 404:
+                raise DataNotAvailableError(
+                    f"Carbon intensity data not available for zone: {zone_id}"
+                )
+
+            # Raise for other errors
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Extract data from Electricity Maps response
+            carbon_intensity = data.get("carbonIntensity")
+            fossil_fuel_pct = data.get("fossilFuelPercentage")
+            renewable_pct = data.get("renewablePercentage")
+
+            if carbon_intensity is None:
+                raise DataNotAvailableError(
+                    f"Carbon intensity value missing in response for zone: {zone_id}"
+                )
+
+            return CarbonIntensity(
+                region=original_region,
+                carbon_intensity=float(carbon_intensity),
+                fossil_fuel_percentage=float(fossil_fuel_pct) if fossil_fuel_pct else None,
+                renewable_percentage=float(renewable_pct) if renewable_pct else None,
+                source="ElectricityMaps",
+            )
+
+        except httpx.HTTPError as e:
+            if isinstance(e, (RateLimitError, AuthenticationError, DataNotAvailableError)):
+                raise
+            raise APIError(f"Failed to fetch carbon intensity data: {str(e)}") from e
 
     def calculate_sci(
         self,

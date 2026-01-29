@@ -69,6 +69,18 @@ type-check: ## Run type checking with mypy
 check: lint type-check test ## Run all checks (lint, type-check, test)
 	@echo "✅ All checks passed!"
 
+docs-serve: ## Serve documentation locally with auto-reload
+	@echo "📚 Serving documentation at http://127.0.0.1:8000"
+	mkdocs serve
+
+docs-build: ## Build documentation static site
+	@echo "📚 Building documentation..."
+	mkdocs build
+
+docs-deploy: ## Deploy documentation to GitHub Pages
+	@echo "📚 Deploying documentation to GitHub Pages..."
+	mkdocs gh-deploy --force
+
 clean: ## Clean build artifacts and cache
 	@echo "🧹 Cleaning up..."
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

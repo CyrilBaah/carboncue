@@ -19,7 +19,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
 # Virtual environments
 venv/
 ENV/
@@ -71,3 +70,4 @@ yarn-error.log*
 # Production
 /dashboard/dist
 /dashboard/build
+site/

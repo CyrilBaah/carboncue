@@ -1,53 +1,84 @@
-# Documentation
+# CarbonCue Documentation
 
-CarbonCue documentation follows the Context7 methodology for AI-agent and human comprehension.
+Welcome to the CarbonCue documentation! This documentation is built with MkDocs and provides comprehensive guides and API references.
 
-## Quick Links
+## Local Development
 
-- [Getting Started](#getting-started)
-- [SDK Documentation](../packages/sdk/README.md)
-- [CLI Documentation](../packages/cli/README.md)
-- [GitHub Action Documentation](../packages/action/README.md)
-- [API Reference](#api-reference)
-- [GSF Principles](#green-software-foundation-principles)
-
-## Getting Started
-
-### Installation
-
-Choose your package based on use case:
+### Build Documentation
 
 ```bash
-# For GitHub Actions (automatic in workflows)
-# See packages/action/README.md
+# Install documentation dependencies
+pip install -e ".[docs]"
 
-# For terminal usage
-pip install carboncue-cli
+# Serve documentation locally with auto-reload
+mkdocs serve
 
-# For Python applications
-pip install carboncue-sdk
-
-# For development (all packages)
-git clone https://github.com/CyrilBaah/carboncue.git
-cd carboncue
-pip install -e ".[dev]"
+# Build static documentation
+mkdocs build
 ```
 
-### Quick Start
+### Documentation Structure
 
-#### GitHub Action (Recommended)
+```
+docs/
+├── index.md                    # Home page
+├── getting-started/
+│   ├── installation.md         # Installation guide
+│   ├── quickstart.md           # Quick start tutorial
+│   └── configuration.md        # Configuration options
+├── guides/
+│   ├── github-action.md        # GitHub Action guide
+│   ├── cli.md                  # CLI usage guide
+│   ├── sdk.md                  # SDK integration guide
+│   └── regions.md              # Region mapping guide
+├── examples/
+│   ├── basic-usage.md          # Basic examples
+│   ├── custom-thresholds.md    # Custom threshold examples
+│   └── multi-region.md         # Multi-region examples
+└── reference/                  # Auto-generated API docs
+```
+
+## Contributing to Documentation
+
+### Writing Guidelines
+
+- Use clear, concise language
+- Include code examples for all features
+- Use admonitions for warnings and notes
+- Test all code examples
+- Follow the existing structure
+
+### Code Examples
+
+All code examples should be:
+- **Runnable**: Can be copy-pasted and executed
+- **Complete**: Include all necessary imports
+- **Explained**: Include comments where needed
+- **Tested**: Verify they work before committing
+
+### Building
+
+Documentation is automatically generated from:
+- Markdown files in `docs/`
+- Docstrings in Python source code
+- Type hints and annotations
+
+## Deployment
+
+Documentation is automatically deployed to GitHub Pages on push to main:
 
 ```yaml
-- uses: carboncue/action@v1
-  with:
-    mode: 'hybrid' # Simple choice
+# .github/workflows/docs.yml
+- name: Deploy to GitHub Pages
+  run: mkdocs gh-deploy --force
 ```
 
-#### CLI
+## Links
 
-```bash
-# Check carbon intensity
-carboncue check --region us-west-2
+- [Live Documentation](https://carboncue.dev)
+- [GitHub Repository](https://github.com/CyrilBaah/carboncue)
+- [API Reference](https://carboncue.dev/reference/)
+
 
 # Calculate SCI score
 carboncue sci --operations 100 --materials 50 --functional-unit 1000
