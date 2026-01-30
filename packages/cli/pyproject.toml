@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "carboncue-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "Terminal interface for carbon-aware development"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 
 dependencies = [
-    "carboncue-sdk>=1.0.0",
+    "carboncue-sdk>=1.1.0",
     "click>=8.1.8",
     "rich>=13.9.4",
     "python-dotenv>=1.0.1",
