@@ -228,4 +228,4 @@ carboncue check \
 
 - [Quick Start Guide](quickstart.md)
 - [SDK Integration Guide](../guides/sdk.md)
-- [API Reference](../reference/carboncue_sdk/)
+- [API Reference](../reference/)

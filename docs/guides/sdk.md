@@ -44,10 +44,10 @@ from carboncue_sdk import CarbonClient
 
 async def main():
     client = CarbonClient()
-    
+
     # Must enter context before making API calls
     await client.__aenter__()
-    
+
     try:
         intensity = await client.get_current_intensity("us-west-2", "aws")
         print(intensity.carbon_intensity)
@@ -68,13 +68,13 @@ async with CarbonClient() as client:
     try:
         # AWS region
         aws_intensity = await client.get_current_intensity("us-west-2", "aws")
-        
+
         # Azure region
         azure_intensity = await client.get_current_intensity("eastus", "azure")
-        
+
         # GCP region
         gcp_intensity = await client.get_current_intensity("us-west1", "gcp")
-        
+
     except InvalidRegionError as e:
         print(f"Region not supported: {e}")
 ```
@@ -128,20 +128,20 @@ from carboncue_sdk import CarbonClient
 
 async def calculate_api_carbon_footprint():
     """Calculate carbon footprint for an API endpoint."""
-    
+
     async with CarbonClient() as client:
         # Get current carbon intensity
         intensity = await client.get_current_intensity("us-west-2", "aws")
-        
+
         # API metrics
         energy_per_request = 0.0001  # kWh per request
         requests_processed = 1_000_000
         server_embodied = 1000.0  # gCO2eq from server hardware
-        
+
         # Calculate operational emissions
         total_energy = energy_per_request * requests_processed
         operational = total_energy * intensity.carbon_intensity
-        
+
         # Calculate SCI
         sci = client.calculate_sci(
             operational_emissions=operational,
@@ -150,7 +150,7 @@ async def calculate_api_carbon_footprint():
             functional_unit_type="requests",
             region="us-west-2"
         )
-        
+
         print(f"📊 API Carbon Footprint Report")
         print(f"   Region: {intensity.region}")
         print(f"   Grid Intensity: {intensity.carbon_intensity} gCO2eq/kWh")
@@ -172,7 +172,7 @@ try:
     # Map cloud region to Electricity Maps zone
     zone_id = RegionMapper.get_zone_id("us-west-2", "aws")
     print(f"AWS us-west-2 maps to zone: {zone_id}")
-    
+
 except InvalidRegionError:
     print("Region not supported")
 except InvalidProviderError:
@@ -215,31 +215,31 @@ async def robust_carbon_check(region: str, provider: str):
         try:
             intensity = await client.get_current_intensity(region, provider)
             return intensity
-            
+
         except AuthenticationError:
             print("❌ Authentication failed. Check your API key.")
             return None
-            
+
         except InvalidRegionError as e:
             print(f"❌ Invalid region: {e}")
             return None
-            
+
         except InvalidProviderError as e:
             print(f"❌ Invalid provider: {e}")
             return None
-            
+
         except RateLimitError:
             print("⏸️  Rate limit exceeded. Please try again later.")
             return None
-            
+
         except DataNotAvailableError:
             print("📊 Carbon data not available for this region.")
             return None
-            
+
         except APIError as e:
             print(f"🌐 API error: {e}")
             return None
-            
+
         except CarbonCueError as e:
             print(f"❌ CarbonCue error: {e}")
             return None
@@ -314,14 +314,14 @@ async def find_greenest_region(regions: list[tuple[str, str]]) -> tuple[str, flo
     """Find the region with lowest carbon intensity."""
     async with CarbonClient() as client:
         results = []
-        
+
         for region, provider in regions:
             try:
                 intensity = await client.get_current_intensity(region, provider)
                 results.append((region, intensity.carbon_intensity))
             except Exception as e:
                 print(f"Skipping {region}: {e}")
-        
+
         # Return region with lowest intensity
         return min(results, key=lambda x: x[1])
 
@@ -338,5 +338,5 @@ print(f"Greenest region: {greenest} ({intensity} gCO2eq/kWh)")
 ## Next Steps
 
 - [Configuration Guide](../getting-started/configuration.md)
-- [API Reference](../reference/carboncue_sdk/)
+- [API Reference](../reference/)
 - [Examples](../examples/basic-usage.md)

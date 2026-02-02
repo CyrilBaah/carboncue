@@ -122,4 +122,4 @@ Add the API key as a repository secret:
 
 - [Quick Start Guide](quickstart.md)
 - [Configuration Options](configuration.md)
-- [API Reference](../reference/carboncue_sdk/)
+- [API Reference](../reference/)

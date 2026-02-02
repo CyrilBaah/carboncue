@@ -14,7 +14,7 @@ async def main():
             region="us-west-2",
             provider="aws"
         )
-        
+
         print(f"🌍 Carbon Intensity Report")
         print(f"   Region: {intensity.region}")
         print(f"   Carbon: {intensity.carbon_intensity} gCO2eq/kWh")
@@ -42,12 +42,12 @@ from carboncue_sdk import CarbonClient
 
 def calculate_api_sci():
     client = CarbonClient()
-    
+
     # Metrics from your service
     operational_emissions = 150.0  # gCO2eq from energy
     embodied_emissions = 75.0      # gCO2eq from hardware
     total_requests = 10_000        # Requests processed
-    
+
     sci = client.calculate_sci(
         operational_emissions=operational_emissions,
         embodied_emissions=embodied_emissions,
@@ -55,7 +55,7 @@ def calculate_api_sci():
         functional_unit_type="requests",
         region="us-west-2"
     )
-    
+
     print(f"📊 SCI Score: {sci.score:.6f} gCO2eq per request")
     print(f"   Total Emissions: {sci.operational_emissions + sci.embodied_emissions} gCO2eq")
     print(f"   Functional Units: {sci.functional_unit:,} {sci.functional_unit_type}")
@@ -84,16 +84,16 @@ async def compare_regions():
         ("us-east-1", "aws"),
         ("eu-west-1", "aws"),
     ]
-    
+
     async with CarbonClient() as client:
         print("🌍 Comparing Cloud Regions\n")
-        
+
         results = []
         for region, provider in regions:
             intensity = await client.get_current_intensity(region, provider)
             results.append((region, intensity.carbon_intensity))
             print(f"   {region}: {intensity.carbon_intensity} gCO2eq/kWh")
-        
+
         # Find greenest
         greenest = min(results, key=lambda x: x[1])
         print(f"\n✅ Greenest region: {greenest[0]} ({greenest[1]} gCO2eq/kWh)")
@@ -116,10 +116,10 @@ async def compare_providers():
         ("westus2", "azure"),      # Washington
         ("us-west1", "gcp"),       # Oregon
     ]
-    
+
     async with CarbonClient() as client:
         print("☁️  Comparing Cloud Providers (West Coast US)\n")
-        
+
         for region, provider in regions:
             try:
                 intensity = await client.get_current_intensity(region, provider)
@@ -143,10 +143,10 @@ async def should_run_batch_job(threshold: float = 300.0) -> bool:
     """Check if we should run a batch job based on carbon intensity."""
     async with CarbonClient() as client:
         intensity = await client.get_current_intensity("us-west-2", "aws")
-        
+
         print(f"⚡ Current carbon intensity: {intensity.carbon_intensity} gCO2eq/kWh")
         print(f"📏 Threshold: {threshold} gCO2eq/kWh")
-        
+
         if intensity.carbon_intensity <= threshold:
             print("✅ Carbon intensity is acceptable - running job")
             return True
@@ -191,25 +191,25 @@ async def get_carbon_intensity_safe(region: str, provider: str = "aws"):
                 "carbon_intensity": intensity.carbon_intensity,
                 "renewable_pct": intensity.renewable_percentage,
             }
-    
+
     except AuthenticationError:
         return {
             "success": False,
             "error": "Authentication failed - check API key"
         }
-    
+
     except InvalidRegionError as e:
         return {
             "success": False,
             "error": f"Invalid region: {e}"
         }
-    
+
     except RateLimitError:
         return {
             "success": False,
             "error": "Rate limit exceeded - try again later"
         }
-    
+
     except DataNotAvailableError:
         return {
             "success": False,
@@ -274,4 +274,4 @@ carboncue providers
 - [Custom Thresholds Example](custom-thresholds.md)
 - [Multi-Region Example](multi-region.md)
 - [SDK Guide](../guides/sdk.md)
-- [API Reference](../reference/carboncue_sdk/)
+- [API Reference](../reference/)

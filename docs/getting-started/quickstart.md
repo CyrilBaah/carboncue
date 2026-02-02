@@ -7,7 +7,7 @@ This guide will walk you through your first carbon-aware workflow using CarbonCu
 !!! info "API Key Requirement"
     - ✅ **SCI calculations** work without an API key
     - ⚠️ **Carbon intensity checks** require an API key from [Electricity Maps](https://www.electricitymap.org/)
-    
+
     Set your API key: `export CARBONCUE_ELECTRICITY_MAPS_API_KEY="your-key"`
 
 ### Calculate SCI Score (No API Key Needed)
@@ -18,7 +18,7 @@ from carboncue_sdk import CarbonClient
 def calculate_software_carbon_intensity():
     # ✅ No API key needed for SCI calculations
     client = CarbonClient()
-    
+
     # Calculate SCI score
     # SCI = (Operational + Embodied) / Functional Units
     sci = client.calculate_sci(
@@ -28,7 +28,7 @@ def calculate_software_carbon_intensity():
         functional_unit_type="requests",
         region="us-west-2"
     )
-    
+
     print(f"SCI Score: {sci.score:.4f} gCO2eq per request")
     print(f"Total Emissions: {sci.operational_emissions + sci.embodied_emissions} gCO2eq")
 
@@ -49,7 +49,7 @@ async def check_carbon_intensity():
             region="us-west-2",
             provider="aws"
         )
-        
+
         print(f"Region: {intensity.region}")
         print(f"Carbon Intensity: {intensity.carbon_intensity} gCO2eq/kWh")
         print(f"Renewable: {intensity.renewable_percentage}%")
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Check Carbon Intensity
         uses: CyrilBaah/carboncue@v1.0.0
         env:
@@ -140,7 +140,7 @@ jobs:
           region: us-west-2
           cloud-provider: aws
           threshold: 300
-      
+
       - name: Run Tests (Carbon-Aware)
         run: |
           npm test
@@ -162,7 +162,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Check Carbon Before Deploy
         uses: CyrilBaah/carboncue@v1.0.0
         env:
@@ -172,7 +172,7 @@ jobs:
           cloud-provider: aws
           threshold: 250
           fail-on-threshold: true
-      
+
       - name: Deploy to Production
         run: |
           echo "Deploying with low carbon intensity"
@@ -200,13 +200,13 @@ async def robust_carbon_check():
                 provider="aws"
             )
             print(f"Success: {intensity.carbon_intensity} gCO2eq/kWh")
-        
+
         except AuthenticationError:
             print("Error: Invalid or missing API key")
-        
+
         except InvalidRegionError as e:
             print(f"Error: {e}")
-        
+
         except RateLimitError:
             print("Error: API rate limit exceeded, try again later")
 
@@ -219,4 +219,4 @@ asyncio.run(robust_carbon_check())
 - [SDK Guide](../guides/sdk.md) - Advanced SDK usage
 - [CLI Guide](../guides/cli.md) - CLI command reference
 - [GitHub Action Guide](../guides/github-action.md) - Action configuration
-- [API Reference](../reference/carboncue_sdk/) - Complete API documentation
+- [API Reference](../reference/) - Complete API documentation

@@ -86,12 +86,11 @@ nav:
       - CLI Usage: guides/cli.md
       - SDK Integration: guides/sdk.md
       - Region Mapping: guides/regions.md
-  - API Reference:
-      - reference/
+  - API Reference: reference/
   - Examples:
-      - examples/basic-usage.md
-      - examples/custom-thresholds.md
-      - examples/multi-region.md
+      - Basic Usage: examples/basic-usage.md
+      - Custom Thresholds: examples/custom-thresholds.md
+      - Multi-Region: examples/multi-region.md
   - Contributing: CONTRIBUTING.md
   - Changelog: CHANGELOG.md
 

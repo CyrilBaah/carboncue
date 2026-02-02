@@ -23,7 +23,7 @@ CarbonCue helps developers measure and reduce the carbon footprint of their soft
 
 - [Installation Guide](getting-started/installation.md)
 - [Quick Start Tutorial](getting-started/quickstart.md)
-- [API Reference](reference/carboncue_sdk/)
+- [API Reference](reference/)
 - [GitHub Repository](https://github.com/CyrilBaah/carboncue)
 
 ## How It Works
@@ -56,14 +56,14 @@ CarbonCue is built on [Green Software Foundation](https://greensoftware.foundati
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v4
-          
+
           - name: Check Carbon Intensity
             uses: CyrilBaah/carboncue@v1.0.0
             with:
               region: us-west-2
               cloud-provider: aws
               threshold: 200
-          
+
           - name: Deploy
             run: echo "Deploying with low carbon intensity!"
     ```
